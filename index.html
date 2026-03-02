@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XOX Game</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        color: white;
+        flex-direction: column;
+    }
+
+    h1 {
+        margin-bottom: 10px;
+    }
+
+    .board {
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        grid-template-rows: repeat(3, 100px);
+        gap: 5px;
+    }
+
+    .cell {
+        background: white;
+        color: #2a5298;
+        font-size: 2.5rem;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        border-radius: 10px;
+        transition: 0.2s;
+    }
+
+    .cell:hover {
+        background: #ddd;
+    }
+
+    .status {
+        margin-top: 15px;
+        font-size: 1.2rem;
+    }
+
+    button {
+        margin-top: 15px;
+        padding: 8px 15px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background: #ffcc00;
+        color: black;
+    }
+
+    button:hover {
+        background: #ffaa00;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>XOX Game</h1>
+
+<div class="board" id="board"></div>
+
+<div class="status" id="status">Player X's Turn</div>
+<button onclick="resetGame()">Restart Game</button>
+
+<script>
+    const board = document.getElementById("board");
+    const statusText = document.getElementById("status");
+
+    let currentPlayer = "X";
+    let gameActive = true;
+    let cells = ["", "", "", "", "", "", "", "", ""];
+
+    const winningCombinations = [
+        [0,1,2], [3,4,5], [6,7,8],
+        [0,3,6], [1,4,7], [2,5,8],
+        [0,4,8], [2,4,6]
+    ];
+
+    function createBoard() {
+        board.innerHTML = "";
+        cells.forEach((cell, index) => {
+            const cellElement = document.createElement("div");
+            cellElement.classList.add("cell");
+            cellElement.dataset.index = index;
+            cellElement.innerText = cell;
+            cellElement.addEventListener("click", handleClick);
+            board.appendChild(cellElement);
+        });
+    }
+
+    function handleClick(e) {
+        const index = e.target.dataset.index;
+
+        if (cells[index] !== "" || !gameActive) return;
+
+        cells[index] = currentPlayer;
+        e.target.innerText = currentPlayer;
+
+        checkWinner();
+
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        if (gameActive) {
+            statusText.innerText = `Player ${currentPlayer}'s Turn`;
+        }
+    }
+
+    function checkWinner() {
+        for (let combo of winningCombinations) {
+            const [a, b, c] = combo;
+
+            if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+                statusText.innerText = `Player ${cells[a]} Wins!`;
+                gameActive = false;
+                return;
+            }
+        }
+
+        if (!cells.includes("")) {
+            statusText.innerText = "It's a Draw!";
+            gameActive = false;
+        }
+    }
+
+    function resetGame() {
+        currentPlayer = "X";
+        gameActive = true;
+        cells = ["", "", "", "", "", "", "", "", ""];
+        statusText.innerText = "Player X's Turn";
+        createBoard();
+    }
+
+    createBoard();
+</script>
+
+</body>
+</html>
