@@ -1368,6 +1368,11 @@ textarea{
 
     </div>
 
+    <div id="publishedCoursesGrid"
+         class="grid course-grid"
+         style="margin-top:22px">
+    </div>
+
 </section>
 
 
@@ -2112,7 +2117,7 @@ Interested in atmospheric science and modern weather forecasting.
                             <div class="form-group">
                                 <label>Category</label>
 
-                                <select required>
+                                <select id="newCourseCategory" required>
                                     <option>Meteorology</option>
                                     <option>Climate Science</option>
                                     <option>Forecasting</option>
@@ -2122,19 +2127,22 @@ Interested in atmospheric science and modern weather forecasting.
 
                             <div class="form-group">
                                 <label>Duration</label>
-                                <input placeholder="Example: 12 Hours">
+                                <input id="newCourseDuration"
+                                       placeholder="Example: 12 Hours">
                             </div>
 
                             <div class="form-group">
                                 <label>Modules</label>
-                                <input type="number"
+                                <input id="newCourseModules"
+                                    type="number"
                                        placeholder="Number of modules">
                             </div>
 
                             <div class="form-group full">
                                 <label>Description</label>
 
-                                <textarea required
+                                <textarea id="newCourseDescription"
+                                          required
                                           placeholder="Course description">
                                 </textarea>
 
@@ -2983,6 +2991,10 @@ let currentUser = JSON.parse(
     localStorage.getItem("capacityUser") || "null"
 );
 
+let publishedCourses = JSON.parse(
+    localStorage.getItem("capacityPublishedCourses") || "[]"
+);
+
 let registeredUsers = JSON.parse(
     localStorage.getItem("capacityUsers") || "[]"
 );
@@ -3458,6 +3470,44 @@ function openCourse(courseName){
 
 }
 
+function renderPublishedCourses(){
+
+    const container =
+        document.getElementById("publishedCoursesGrid");
+
+    if(!container) return;
+
+    container.innerHTML = publishedCourses.map(course => `
+        <div class="card course-card">
+            <div class="course-image">📘</div>
+            <div class="course-body">
+                <span class="tag">${escapeHTML(course.category)}</span>
+                <h3 style="margin-top:12px">${escapeHTML(course.name)}</h3>
+                <p>${escapeHTML(course.description)}</p>
+                <div class="course-meta">
+                    <span>📚 ${escapeHTML(course.modules || "Self-paced")} Modules</span>
+                    <span>⏱ ${escapeHTML(course.duration || "Flexible")}</span>
+                </div>
+                <button class="btn btn-primary"
+                        onclick="openPublishedCourse(${course.id})">
+                    View Course
+                </button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function openPublishedCourse(courseId){
+
+    const course = publishedCourses.find(
+        item => item.id === courseId
+    );
+
+    if(course){
+        openCourse(course.name);
+    }
+}
+
 function enrollCourse(){
 
     closeModal("courseModal");
@@ -3521,6 +3571,25 @@ document.getElementById("createCourseForm")
     const course =
         document.getElementById("newCourseName")
         .value;
+
+    const publishedCourse = {
+        id: Date.now(),
+        name: course,
+        category: document.getElementById("newCourseCategory").value,
+        duration: document.getElementById("newCourseDuration").value,
+        modules: document.getElementById("newCourseModules").value,
+        description: document.getElementById("newCourseDescription").value,
+        trainer: currentUser?.name || "CAPACITY CONNECT Trainer"
+    };
+
+    publishedCourses.push(publishedCourse);
+
+    localStorage.setItem(
+        "capacityPublishedCourses",
+        JSON.stringify(publishedCourses)
+    );
+
+    renderPublishedCourses();
 
     showToast(
         `"${course}" course created successfully!`
@@ -3765,6 +3834,8 @@ function escapeHTML(text){
 /* ================= AUTO LOGIN ================= */
 
 window.addEventListener("load",function(){
+
+    renderPublishedCourses();
 
     if(currentUser){
 
