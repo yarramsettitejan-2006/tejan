@@ -1,0 +1,10 @@
+{
+  "name": "capacity-connect",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Capacity Connect learning portal",
+  "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "@supabase/ssr": "latest"
+  }
+}
