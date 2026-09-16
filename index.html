@@ -1437,6 +1437,11 @@ textarea{
 
     </div>
 
+    <div id="publicAnnouncements"
+         class="card"
+         style="margin-top:22px">
+    </div>
+
 </section>
 
 
@@ -2995,6 +3000,10 @@ let publishedCourses = JSON.parse(
     localStorage.getItem("capacityPublishedCourses") || "[]"
 );
 
+let publishedAnnouncements = JSON.parse(
+    localStorage.getItem("capacityPublishedAnnouncements") || "[]"
+);
+
 let registeredUsers = JSON.parse(
     localStorage.getItem("capacityUsers") || "[]"
 );
@@ -3488,6 +3497,9 @@ function renderPublishedCourses(){
                     <span>📚 ${escapeHTML(course.modules || "Self-paced")} Modules</span>
                     <span>⏱ ${escapeHTML(course.duration || "Flexible")}</span>
                 </div>
+                <small style="display:block;color:var(--muted);margin-bottom:14px">
+                    Updated ${formatUpdateTime(course.updatedAt)}
+                </small>
                 <button class="btn btn-primary"
                         onclick="openPublishedCourse(${course.id})">
                     View Course
@@ -3495,6 +3507,42 @@ function renderPublishedCourses(){
             </div>
         </div>
     `).join("");
+}
+
+function renderPublicAnnouncements(){
+
+    const container =
+        document.getElementById("publicAnnouncements");
+
+    if(!container) return;
+
+    if(publishedAnnouncements.length === 0){
+        container.innerHTML = "";
+        return;
+    }
+
+    container.innerHTML = `
+        <h3>New Updates</h3>
+        ${publishedAnnouncements.slice().reverse().map(announcement => `
+            <div style="padding:14px 0">
+                <strong>📢 ${escapeHTML(announcement.title)}</strong>
+                <p style="margin-top:6px">${escapeHTML(announcement.message)}</p>
+                <small style="display:block;color:var(--muted);margin-top:8px">
+                    Updated ${formatUpdateTime(announcement.updatedAt)}
+                </small>
+            </div>
+        `).join("<hr style=\"margin:0;border:0;border-top:1px solid #eee\">")}
+    `;
+}
+
+function formatUpdateTime(timestamp){
+
+    if(!timestamp) return "just now";
+
+    return new Date(timestamp).toLocaleString([], {
+        dateStyle:"medium",
+        timeStyle:"short"
+    });
 }
 
 function openPublishedCourse(courseId){
@@ -3579,7 +3627,8 @@ document.getElementById("createCourseForm")
         duration: document.getElementById("newCourseDuration").value,
         modules: document.getElementById("newCourseModules").value,
         description: document.getElementById("newCourseDescription").value,
-        trainer: currentUser?.name || "CAPACITY CONNECT Trainer"
+        trainer: currentUser?.name || "CAPACITY CONNECT Trainer",
+        updatedAt: new Date().toISOString()
     };
 
     publishedCourses.push(publishedCourse);
@@ -3720,6 +3769,20 @@ document.getElementById("announcementForm")
         document.getElementById("announcementMessage")
         .value;
 
+    publishedAnnouncements.push({
+        id: Date.now(),
+        title,
+        message,
+        updatedAt: new Date().toISOString()
+    });
+
+    localStorage.setItem(
+        "capacityPublishedAnnouncements",
+        JSON.stringify(publishedAnnouncements)
+    );
+
+    renderPublicAnnouncements();
+
     const container =
         document.getElementById(
             "publishedAnnouncements"
@@ -3836,6 +3899,7 @@ function escapeHTML(text){
 window.addEventListener("load",function(){
 
     renderPublishedCourses();
+    renderPublicAnnouncements();
 
     if(currentUser){
 
@@ -3843,6 +3907,21 @@ window.addEventListener("load",function(){
 
     }
 
+});
+
+window.addEventListener("storage",function(event){
+
+    if(event.key === "capacityPublishedCourses"){
+        publishedCourses = JSON.parse(event.newValue || "[]");
+        renderPublishedCourses();
+        showToast("Course list updated.");
+    }
+
+    if(event.key === "capacityPublishedAnnouncements"){
+        publishedAnnouncements = JSON.parse(event.newValue || "[]");
+        renderPublicAnnouncements();
+        showToast("Announcements updated.");
+    }
 });
 
 
