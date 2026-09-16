@@ -2995,7 +2995,7 @@ Interested in atmospheric science and modern weather forecasting.
    ========================================================= */
 
 const supabaseConfig = window.SUPABASE_CONFIG || {};
-const supabaseClient =
+let supabaseClient =
     window.supabase &&
     supabaseConfig.url &&
     supabaseConfig.anonKey &&
@@ -3019,6 +3019,8 @@ async function checkSupabaseConnection(){
 
     if(error){
         console.warn("Supabase connection check failed:", error.message);
+        supabaseClient = null;
+        window.capacitySupabase = null;
         return;
     }
 
@@ -3096,6 +3098,40 @@ let publishedAnnouncements = JSON.parse(
 let registeredUsers = JSON.parse(
     localStorage.getItem("capacityUsers") || "[]"
 );
+
+function ensureLocalAdminUser(){
+
+    const adminEmail = "admin@capacity.com";
+    const adminPassword = "admin123";
+
+    const alreadyExists = registeredUsers.some(
+        user => user.email.toLowerCase() === adminEmail.toLowerCase()
+    );
+
+    if(!alreadyExists){
+        registeredUsers.push({
+            id: 1,
+            name: "System Admin",
+            email: adminEmail,
+            registerNumber: "ADMIN-001",
+            role: "admin",
+            password: adminPassword,
+            approved: true
+        });
+
+        localStorage.setItem(
+            "capacityUsers",
+            JSON.stringify(registeredUsers)
+        );
+    }
+
+    return {
+        email: adminEmail,
+        password: adminPassword
+    };
+}
+
+ensureLocalAdminUser();
 
 let selectedRegisterRole = "trainee";
 
