@@ -2986,11 +2986,44 @@ Interested in atmospheric science and modern weather forecasting.
 </div>
 
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script>
 
 /* =========================================================
    CAPACITY CONNECT JAVASCRIPT
    ========================================================= */
+
+const supabaseConfig = window.SUPABASE_CONFIG || {};
+const supabaseClient =
+    window.supabase &&
+    supabaseConfig.url &&
+    supabaseConfig.anonKey &&
+    !supabaseConfig.url.includes("YOUR-PROJECT-REF")
+        ? window.supabase.createClient(
+            supabaseConfig.url,
+            supabaseConfig.anonKey
+        )
+        : null;
+
+window.capacitySupabase = supabaseClient;
+
+async function checkSupabaseConnection(){
+
+    if(!supabaseClient) return;
+
+    const { error } = await supabaseClient
+        .from("courses")
+        .select("id")
+        .limit(1);
+
+    if(error){
+        console.warn("Supabase connection check failed:", error.message);
+        return;
+    }
+
+    console.info("Supabase connection is ready.");
+}
 
 let currentUser = JSON.parse(
     localStorage.getItem("capacityUser") || "null"
@@ -3898,6 +3931,7 @@ function escapeHTML(text){
 
 window.addEventListener("load",function(){
 
+    checkSupabaseConnection();
     renderPublishedCourses();
     renderPublicAnnouncements();
 
