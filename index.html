@@ -3025,6 +3025,62 @@ async function checkSupabaseConnection(){
     console.info("Supabase connection is ready.");
 }
 
+function hasSupabase(){
+    return Boolean(supabaseClient);
+}
+
+async function loadSupabaseContent(){
+
+    if(!hasSupabase()) return;
+
+    const [{ data: courses, error: coursesError }, { data: announcements, error: announcementsError }] =
+        await Promise.all([
+            supabaseClient
+                .from("courses")
+                .select("id,title,category,duration,modules,description,created_at,updated_at")
+                .eq("published", true)
+                .order("created_at", { ascending: false }),
+            supabaseClient
+                .from("announcements")
+                .select("id,title,message,created_at,updated_at")
+                .order("created_at", { ascending: false })
+        ]);
+
+    if(!coursesError){
+        publishedCourses = courses.map(course => ({
+            id: course.id,
+            name: course.title,
+            category: course.category,
+            duration: course.duration,
+            modules: course.modules,
+            description: course.description,
+            updatedAt: course.updated_at || course.created_at
+        }));
+        renderPublishedCourses();
+    }
+
+    if(!announcementsError){
+        publishedAnnouncements = announcements.map(announcement => ({
+            id: announcement.id,
+            title: announcement.title,
+            message: announcement.message,
+            updatedAt: announcement.updated_at || announcement.created_at
+        }));
+        renderPublicAnnouncements();
+    }
+}
+
+function subscribeToSupabaseUpdates(){
+
+    if(!hasSupabase()) return;
+
+    supabaseClient
+        .channel("capacity-connect-content")
+        .on("postgres_changes", { event: "*", schema: "public", table: "courses" }, loadSupabaseContent)
+        .on("postgres_changes", { event: "*", schema: "public", table: "announcements" }, loadSupabaseContent)
+        .subscribe();
+}
+
 let currentUser = JSON.parse(
     localStorage.getItem("capacityUser") || "null"
 );
@@ -3131,7 +3187,7 @@ function selectRole(element,role){
 /* ================= REGISTER ================= */
 
 document.getElementById("registerForm")
-.addEventListener("submit",function(e){
+.addEventListener("submit",async function(e){
 
     e.preventDefault();
 
@@ -3146,6 +3202,42 @@ document.getElementById("registerForm")
 
     const role =
         document.getElementById("registerRole").value;
+
+    if(hasSupabase()){
+        const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password: document.getElementById("registerPassword").value
+        });
+
+        if(error){
+            showToast(error.message);
+            return;
+        }
+
+        if(data.user){
+            const { error: profileError } = await supabaseClient
+                .from("profiles")
+                .insert({
+                    id: data.user.id,
+                    name,
+                    email,
+                    registration_number: registerNumber,
+                    role,
+                    approved: false
+                });
+
+            if(profileError){
+                showToast(profileError.message);
+                return;
+            }
+        }
+
+        closeModal("registerModal");
+        openModal("loginModal");
+        showToast("Account created. Check your email if confirmation is required.");
+        this.reset();
+        return;
+    }
 
     const user = {
         id: Date.now(),
@@ -3168,11 +3260,6 @@ document.getElementById("registerForm")
         JSON.stringify(registeredUsers)
     );
 
-    localStorage.setItem(
-        "capacityUser",
-        JSON.stringify(user)
-    );
-
     closeModal("registerModal");
 
     openModal("loginModal");
@@ -3187,7 +3274,7 @@ document.getElementById("registerForm")
 /* ================= LOGIN ================= */
 
 document.getElementById("loginForm")
-.addEventListener("submit",function(e){
+.addEventListener("submit",async function(e){
 
     e.preventDefault();
 
@@ -3202,6 +3289,48 @@ document.getElementById("loginForm")
 
     const role =
         document.getElementById("loginRole").value;
+
+    if(hasSupabase()){
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password: document.getElementById("loginPassword").value
+        });
+
+        if(error || !data.user){
+            showToast(error?.message || "Login failed.");
+            return;
+        }
+
+        const { data: profile, error: profileError } = await supabaseClient
+            .from("profiles")
+            .select("id,name,email,registration_number,role,approved")
+            .eq("id", data.user.id)
+            .single();
+
+        if(profileError || !profile){
+            showToast("Your profile is not ready yet.");
+            return;
+        }
+
+        if(!profile.approved && profile.role !== "trainee"){
+            showToast("Your request is waiting for admin approval.");
+            return;
+        }
+
+        currentUser = {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            registerNumber: profile.registration_number,
+            role: profile.role
+        };
+
+        localStorage.setItem("capacityUser", JSON.stringify(currentUser));
+        closeModal("loginModal");
+        showApplication();
+        showToast(`Welcome ${profile.name}!`);
+        return;
+    }
 
     const registeredUser = registeredUsers.find(
         user =>
@@ -3664,14 +3793,40 @@ document.getElementById("createCourseForm")
         updatedAt: new Date().toISOString()
     };
 
-    publishedCourses.push(publishedCourse);
+    if(hasSupabase() && currentUser?.id){
+        supabaseClient
+            .from("courses")
+            .insert({
+                title: publishedCourse.name,
+                category: publishedCourse.category,
+                duration: publishedCourse.duration,
+                modules: Number(publishedCourse.modules) || null,
+                description: publishedCourse.description,
+                trainer_id: currentUser.id,
+                published: true
+            })
+            .then(({ error }) => {
+                if(error){
+                    showToast("Course could not be saved to Supabase.");
+                    console.error(error);
+                    return;
+                }
 
-    localStorage.setItem(
-        "capacityPublishedCourses",
-        JSON.stringify(publishedCourses)
-    );
+                loadSupabaseContent();
+                showToast(`"${course}" course published for everyone!`);
+            });
+    }
 
-    renderPublishedCourses();
+    if(!hasSupabase()){
+        publishedCourses.push(publishedCourse);
+
+        localStorage.setItem(
+            "capacityPublishedCourses",
+            JSON.stringify(publishedCourses)
+        );
+
+        renderPublishedCourses();
+    }
 
     showToast(
         `"${course}" course created successfully!`
@@ -3802,19 +3957,41 @@ document.getElementById("announcementForm")
         document.getElementById("announcementMessage")
         .value;
 
-    publishedAnnouncements.push({
-        id: Date.now(),
-        title,
-        message,
-        updatedAt: new Date().toISOString()
-    });
+    if(hasSupabase() && currentUser?.id){
+        supabaseClient
+            .from("announcements")
+            .insert({
+                title,
+                message,
+                author_id: currentUser.id
+            })
+            .then(({ error }) => {
+                if(error){
+                    showToast("Announcement could not be saved to Supabase.");
+                    console.error(error);
+                    return;
+                }
 
-    localStorage.setItem(
-        "capacityPublishedAnnouncements",
-        JSON.stringify(publishedAnnouncements)
-    );
+                loadSupabaseContent();
+                showToast("Announcement published for everyone!");
+            });
+    }
 
-    renderPublicAnnouncements();
+    if(!hasSupabase()){
+        publishedAnnouncements.push({
+            id: Date.now(),
+            title,
+            message,
+            updatedAt: new Date().toISOString()
+        });
+
+        localStorage.setItem(
+            "capacityPublishedAnnouncements",
+            JSON.stringify(publishedAnnouncements)
+        );
+
+        renderPublicAnnouncements();
+    }
 
     const container =
         document.getElementById(
@@ -3932,6 +4109,8 @@ function escapeHTML(text){
 window.addEventListener("load",function(){
 
     checkSupabaseConnection();
+    loadSupabaseContent();
+    subscribeToSupabaseUpdates();
     renderPublishedCourses();
     renderPublicAnnouncements();
 
